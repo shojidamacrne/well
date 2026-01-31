@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Dame - International Draughts (Working)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root {
+      --cell: 60px;
+      --dark: #769656;
+      --light: #eeeed2;
+      --accent: #2b7cff;
+      --white-piece: #ffffff;
+      --black-piece: #000000;
+      --king: #f7f06b;
+      --hint: rgba(43, 124, 255, 0.5);
+      --mandatory: rgba(255, 95, 95, 0.8);
+    }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .wrap { 
+      display: grid; 
+      gap: 16px; 
+      justify-items: center;
+      max-width: 800px;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+    }
+    h1 { 
+      margin: 0; 
+      font-size: 22px; 
+      letter-spacing: 0.3px; 
+      text-align: center;
+      color: #2c3e50;
+      font-weight: 700;
+    }
+    .rules-summary {
+      background: #f8f9fa;
+      padding: 12px 16px;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      font-size: 13px;
+      line-height: 1.4;
+      border-left: 4px solid #2b7cff;
+      color: #333;
+    }
+    .info { 
+      display: flex; 
+      gap: 12px; 
+      align-items: center; 
+      font-size: 14px; 
+      flex-wrap: wrap; 
+      justify-content: center; 
+    }
+    .badge {
+      padding: 8px 14px; 
+      border-radius: 999px; 
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
+      border: 1px solid #ddd;
+      font-weight: 600;
+      color: #333;
+    }
+    .badge.turn-white { 
+      background: linear-gradient(135deg, #ffffff, #f0f0f0); 
+      border-color: #ccc;
+      color: #333;
+    }
+    .badge.turn-black { 
+      background: linear-gradient(135deg, #333, #000); 
+      color: white;
+      border-color: #555;
+    }
+    .board {
+      display: grid;
+      grid-template-columns: repeat(10, var(--cell));
+      grid-template-rows: repeat(10, var(--cell));
+      border: 8px solid #8B4513; 
+      border-radius: 4px;
+      box-shadow: 0 12px 28px rgba(0,0,0,0.3); 
+      background: #8B4513;
+      user-select: none; 
+      touch-action: manipulation;
+      position: relative;
+    }
+    .cell { 
+      position: relative; 
+      width: var(--cell); 
+      height: var(--cell); 
+      display: grid; 
+      place-items: center; 
+    }
+    .cell.light { background: var(--light); }
+    .cell.dark { background: var(--dark); }
+    .piece {
+      width: 48px; 
+      height: 48px; 
+      border-radius: 50%;
+      box-shadow: inset 0 -3px 5px rgba(0,0,0,0.3), 
+                  0 4px 8px rgba(0,0,0,0.3);
+      border: 2px solid rgba(0,0,0,0.2);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+      z-index: 2;
+    }
+    .piece:hover { 
+      transform: scale(1.08); 
+      box-shadow: inset 0 -3px 5px rgba(0,0,0,0.4), 
+                  0 6px 12px rgba(0,0,0,0.4);
+    }
+    .piece.white { 
+      background: linear-gradient(135deg, #ffffff, #f0f0f0);
+      border-color: rgba(0,0,0,0.3);
+    }
+    .piece.black { 
+      background: linear-gradient(135deg, #333, #000);
+      border-color: rgba(255,255,255,0.1);
+    }
+    .king { 
+      position: absolute; 
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none; 
+      z-index: 3;
+    }
+    .king::after { 
+      content: "♔"; 
+      font-size: 22px; 
+      color: var(--king); 
+      text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+      font-weight: bold;
+    }
+    .selected { 
+      outline: 4px solid var(--accent); 
+      outline-offset: -4px; 
+      z-index: 4; 
+      animation: pulse 1.5s infinite;
+      box-shadow: 0 0 0 4px rgba(43, 124, 255, 0.3);
+    }
+    @keyframes pulse {
+      0% { outline-color: var(--accent); }
+      50% { outline-color: rgba(43, 124, 255, 0.6); }
+      100% { outline-color: var(--accent); }
+    }
+    .hint {
+      position: absolute; 
+      width: 16px; 
+      height: 16px; 
+      border-radius: 50%;
+      background: var(--accent); 
+      border: 2px solid white;
+      pointer-events: none;
+      z-index: 1;
+      box-shadow: 0 0 0 3px rgba(43, 124, 255, 0.2);
+    }
+    .capture-hint {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(255, 50, 50, 0.9);
+      border: 2px solid white;
+      pointer-events: none;
+      z-index: 1;
+      box-shadow: 0 0 0 3px rgba(255, 50, 50, 0.3);
+    }
+    .captured-piece {
+      animation: fadeOut 0.3s forwards;
+      pointer-events: none;
+    }
+    @keyframes fadeOut {
+      from { opacity: 1; transform: scale(1); }
+      to { opacity: 0; transform: scale(0); }
+    }
+    .bar { 
+      display: flex; 
+      gap: 10px; 
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    button {
+      background: linear-gradient(135deg, #2b7cff, #1e5dc9); 
+      color: #fff; 
+      border: none; 
+      border-radius: 8px; 
+      padding: 12px 20px;
+      font-weight: 600; 
+      cursor: pointer; 
+      box-shadow: 0 6px 16px rgba(43,124,255,0.3);
+      transition: all 0.2s;
+      font-size: 14px;
+      min-width: 120px;
+    }
+    button:hover { 
+      transform: translateY(-3px); 
+      box-shadow: 0 10px 20px rgba(43,124,255,0.4); 
+    }
+    button:active { transform: translateY(0); }
+    button.secondary { 
+      background: linear-gradient(135deg, #f0f2f7, #e4e7ee); 
+      color: #333; 
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
+      border: 1px solid #d1d5db; 
+    }
+    button.secondary:hover {
+      background: linear-gradient(135deg, #e4e7ee, #d1d5db);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+    }
+    .status { 
+      min-height: 22px; 
+      font-size: 15px; 
+      color: #333; 
+      text-align: center; 
+      padding: 12px;
+      font-weight: 600;
+      background: #f8f9fa;
+      border-radius: 8px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .stats {
+      display: flex;
+      gap: 24px;
+      background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+      padding: 15px 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      font-size: 14px;
+      color: #333;
+    }
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 80px;
+    }
+    .stat-value {
+      font-weight: bold;
+      font-size: 24px;
+      color: #2c3e50;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🎯 Damascene's Dame</h1>
+    
+    <div class="rules-summary">
+      <strong>🎮 Rules:</strong> Captured pieces removed immediately • Mandatory longest capture • Flying kings
+    </div>
+    
+    <div class="info">
+      <div class="badge" id="turnBadge">🎲 Turn: White (You)</div>
+      <div class="badge" id="captureBadge">⚠️ Mandatory capture: No</div>
+    </div>
+    
+    <div class="board" id="board"></div>
+    
+    <div class="stats">
+      <div class="stat-item">
+        <div class="stat-value" id="whiteCount">20</div>
+        <div class="stat-label">White Pieces</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="blackCount">20</div>
+        <div class="stat-label">Black Pieces</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="moveCount">0</div>
+        <div class="stat-label">Total Moves</div>
+      </div>
+    </div>
+    
+    <div class="bar">
+      <button id="resetBtn">🔄 New Game</button>
+      <button id="hintBtn" class="secondary">💡 Show Hints</button>
+      <button id="undoBtn" class="secondary" disabled>↩️ Undo</button>
+    </div>
+    
+    <div class="status" id="status">White's turn. Click on a white piece to select it.</div>
+  </div>
+
+<script>
+const SIZE = 10;
+let board = [];
+let turn = 'w';
+let selected = null;
+let gameOver = false;
+let showHints = false;
+let moveHistory = [];
+let moveCount = 0;
+let currentJumpPiece = null;
+let capturedPieces = [];
+
+const boardEl = document.getElementById('board');
+const statusEl = document.getElementById('status');
+const turnBadge = document.getElementById('turnBadge');
+const captureBadge = document.getElementById('captureBadge');
+const whiteCountEl = document.getElementById('whiteCount');
+const blackCountEl = document.getElementById('blackCount');
+const moveCountEl = document.getElementById('moveCount');
+
+function makeBoard() {
+  const b = Array.from({length: SIZE}, () => Array(SIZE).fill(null));
+  
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      if ((r + c) % 2 === 1) {
+        b[r][c] = {color: 'w', king: false};
+      }
+    }
+  }
+  
+  for (let r = SIZE - 4; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      if ((r + c) % 2 === 1) {
+        b[r][c] = {color: 'b', king: false};
+      }
+    }
+  }
+  
+  return b;
+}
+
+function inBounds(r, c) {
+  return r >= 0 && r < SIZE && c >= 0 && c < SIZE;
+}
+
+// SIMPLE: Get moves for piece
+function getPieceMoves(b, r, c, mustCapture = false) {
+  const piece = b[r][c];
+  if (!piece) return {steps: [], jumps: []};
+  
+  const steps = [];
+  const jumps = [];
+  
+  let dirs = [];
+  if (piece.king) {
+    dirs = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+  } else {
+    dirs = piece.color === 'w' ? [[1, -1], [1, 1]] : [[-1, -1], [-1, 1]];
+  }
+  
+  if (!mustCapture) {
+    for (const [dr, dc] of dirs) {
+      let nr = r + dr;
+      let nc = c + dc;
+      
+      if (piece.king) {
+        while (inBounds(nr, nc) && !b[nr][nc]) {
+          steps.push({to: [nr, nc], type: 'step'});
+          nr += dr;
+          nc += dc;
+        }
+      } else {
+        if (inBounds(nr, nc) && !b[nr][nc]) {
+          steps.push({to: [nr, nc], type: 'step'});
+        }
+      }
+    }
+  }
+  
+  for (const [dr, dc] of dirs) {
+    if (piece.king) {
+      let nr = r + dr;
+      let nc = c + dc;
+      let foundOpponent = null;
+      
+      while (inBounds(nr, nc)) {
+        if (b[nr][nc]) {
+          if (b[nr][nc].color === piece.color) break;
+          if (foundOpponent) break;
+          foundOpponent = [nr, nc];
+        } else if (foundOpponent) {
+          jumps.push({
+            to: [nr, nc],
+            capture: foundOpponent,
+            type: 'jump'
+          });
+        }
+        nr += dr;
+        nc += dc;
+      }
+    } else {
+      const nr = r + 2 * dr;
+      const nc = c + 2 * dc;
+      const midr = r + dr;
+      const midc = c + dc;
+      
+      if (inBounds(nr, nc) && !b[nr][nc] && 
+          b[midr][midc] && b[midr][midc].color !== piece.color) {
+        jumps.push({
+          to: [nr, nc],
+          capture: [midr, midc],
+          type: 'jump'
+        });
+      }
+    }
+  }
+  
+  return {steps, jumps};
+}
+
+// SIMPLE: Check if piece can capture
+function canCapture(b, r, c) {
+  const {jumps} = getPieceMoves(b, r, c);
+  return jumps.length > 0;
+}
+
+// SIMPLE: Get all moves for color
+function getAllMovesForColor(b, color) {
+  const allMoves = [];
+  let hasAnyCapture = false;
+  
+  // First check for any captures
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const piece = b[r][c];
+      if (piece && piece.color === color) {
+        if (canCapture(b, r, c)) {
+          hasAnyCapture = true;
+        }
+      }
+    }
+  }
+  
+  // If captures exist, only return captures
+  if (hasAnyCapture) {
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        const piece = b[r][c];
+        if (piece && piece.color === color) {
+          const {jumps} = getPieceMoves(b, r, c);
+          for (const jump of jumps) {
+            allMoves.push({
+              from: [r, c],
+              to: jump.to,
+              capture: jump.capture,
+              type: 'jump'
+            });
+          }
+        }
+      }
+    }
+    return {
+      moves: allMoves,
+      hasCaptures: true,
+      maxCaptures: 1
+    };
+  }
+  
+  // No captures, return simple moves
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const piece = b[r][c];
+      if (piece && piece.color === color) {
+        const {steps} = getPieceMoves(b, r, c);
+        for (const step of steps) {
+          allMoves.push({
+            from: [r, c],
+            to: step.to,
+            type: 'step'
+          });
+        }
+      }
+    }
+  }
+  
+  return {
+    moves: allMoves,
+    hasCaptures: false,
+    maxCaptures: 0
+  };
+}
+
+function render() {
+  boardEl.innerHTML = '';
+  
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const cell = document.createElement('div');
+      cell.className = `cell ${((r + c) % 2 === 1) ? 'dark' : 'light'}`;
+      cell.dataset.row = r;
+      cell.dataset.col = c;
+      
+      const piece = board[r][c];
+      if (piece) {
+        const pieceEl = document.createElement('div');
+        pieceEl.className = `piece ${piece.color === 'w' ? 'white' : 'black'}`;
+        
+        if (selected && selected.row === r && selected.col === c) {
+          pieceEl.classList.add('selected');
+        }
+        
+        if (currentJumpPiece && currentJumpPiece.row === r && currentJumpPiece.col === c) {
+          pieceEl.style.outline = '3px solid #ff9900';
+          pieceEl.style.outlineOffset = '-3px';
+        }
+        
+        // Check if this piece should be shown as captured
+        if (capturedPieces.some(([cr, cc]) => cr === r && cc === c)) {
+          pieceEl.classList.add('captured-piece');
+        }
+        
+        cell.appendChild(pieceEl);
+        
+        if (piece.king) {
+          const kingEl = document.createElement('div');
+          kingEl.className = 'king';
+          cell.appendChild(kingEl);
+        }
+      }
+      
+      boardEl.appendChild(cell);
+    }
+  }
+  
+  updateStats();
+  
+  turnBadge.textContent = `🎲 Turn: ${turn === 'w' ? 'White (You)' : 'Black (Computer)'}`;
+  turnBadge.className = `badge ${turn === 'w' ? 'turn-white' : 'turn-black'}`;
+  
+  const currentMoves = getAllMovesForColor(board, turn);
+  captureBadge.textContent = currentMoves.hasCaptures 
+    ? `⚠️ Mandatory capture!` 
+    : '✅ No mandatory capture';
+  captureBadge.style.background = currentMoves.hasCaptures 
+    ? 'linear-gradient(135deg, #ffcccc, #ff9999)' 
+    : 'linear-gradient(135deg, #ccffcc, #99ff99)';
+  
+  if (showHints && selected && turn === 'w') {
+    const {steps, jumps} = getPieceMoves(board, selected.row, selected.col);
+    
+    // Only show steps if no captures available
+    if (!currentMoves.hasCaptures) {
+      for (const step of steps) {
+        const [nr, nc] = step.to;
+        const cellIndex = nr * SIZE + nc;
+        const hintCell = boardEl.children[cellIndex];
+        if (hintCell) {
+          const hint = document.createElement('div');
+          hint.className = 'hint';
+          hintCell.appendChild(hint);
+        }
+      }
+    }
+    
+    // Always show jump hints
+    for (const jump of jumps) {
+      const [nr, nc] = jump.to;
+      const cellIndex = nr * SIZE + nc;
+      const hintCell = boardEl.children[cellIndex];
+      if (hintCell) {
+        const hint = document.createElement('div');
+        hint.className = 'capture-hint';
+        hintCell.appendChild(hint);
+      }
+    }
+  }
+}
+
+function updateStats() {
+  let whiteCount = 0;
+  let blackCount = 0;
+  
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const piece = board[r][c];
+      if (piece) {
+        if (piece.color === 'w') whiteCount++;
+        else blackCount++;
+      }
+    }
+  }
+  
+  whiteCountEl.textContent = whiteCount;
+  blackCountEl.textContent = blackCount;
+  moveCountEl.textContent = moveCount;
+  
+  if (gameOver) return;
+  
+  if (whiteCount === 0) {
+    gameOver = true;
+    statusEl.textContent = "🏆 Black wins! All white pieces captured.";
+  } else if (blackCount === 0) {
+    gameOver = true;
+    statusEl.textContent = "🏆 White wins! All black pieces captured.";
+  } else if (getAllMovesForColor(board, turn).moves.length === 0) {
+    gameOver = true;
+    statusEl.textContent = `🏆 ${turn === 'w' ? 'Black' : 'White'} wins! ${turn === 'w' ? 'White' : 'Black'} has no moves.`;
+  }
+}
+
+function cloneBoard(b) {
+  return JSON.parse(JSON.stringify(b));
+}
+
+function saveToHistory(from, to, capture) {
+  moveHistory.push({
+    board: cloneBoard(board),
+    from: [...from],
+    to: [...to],
+    capture: capture ? [...capture] : null,
+    turn: turn,
+    moveNumber: moveCount,
+    currentJumpPiece: currentJumpPiece ? {...currentJumpPiece} : null
+  });
+  
+  document.getElementById('undoBtn').disabled = false;
+}
+
+// FIXED: Execute move with proper piece removal
+function executeMove(from, to, capture = null) {
+  const [fr, fc] = from;
+  const [tr, tc] = to;
+  const piece = board[fr][fc];
+  
+  // Save to history
+  saveToHistory(from, to, capture);
+  
+  // Move piece
+  board[fr][fc] = null;
+  board[tr][tc] = {...piece};
+  
+  // Mark captured piece for animation
+  if (capture) {
+    const [cr, cc] = capture;
+    capturedPieces.push([cr, cc]);
+    
+    // Remove captured piece from board
+    board[cr][cc] = null;
+  }
+  
+  // King promotion
+  if (!piece.king) {
+    if (piece.color === 'w' && tr === SIZE - 1) {
+      board[tr][tc].king = true;
+      statusEl.textContent = "👑 White piece promoted to King!";
+    } else if (piece.color === 'b' && tr === 0) {
+      board[tr][tc].king = true;
+      statusEl.textContent = "👑 Black piece promoted to King!";
+    }
+  }
+  
+  moveCount++;
+  
+  // Render to show captured pieces with animation
+  render();
+  
+  // Clear captured pieces after animation
+  setTimeout(() => {
+    capturedPieces = [];
+  }, 300);
+}
+
+function canContinueJump(r, c) {
+  const {jumps} = getPieceMoves(board, r, c, true);
+  return jumps.length > 0;
+}
+
+// Event Listeners
+boardEl.addEventListener('click', (e) => {
+  if (gameOver || turn !== 'w') return;
+  
+  const cell = e.target.closest('.cell');
+  if (!cell) return;
+  
+  const r = +cell.dataset.row;
+  const c = +cell.dataset.col;
+  const piece = board[r][c];
+  
+  // Clicking on own piece
+  if (piece && piece.color === 'w') {
+    // If in multi-jump, must continue with same piece
+    if (currentJumpPiece) {
+      if (!(r === currentJumpPiece.row && c === currentJumpPiece.col)) {
+        statusEl.textContent = "⚠️ You must continue jumping with the same piece!";
+        return;
+      }
+    }
+    
+    const moves = getAllMovesForColor(board, 'w');
+    const pieceHasMove = moves.moves.some(m => 
+      m.from[0] === r && m.from[1] === c
+    );
+    
+    if (!pieceHasMove) {
+      statusEl.textContent = "❌ This piece has no legal moves.";
+      return;
+    }
+    
+    selected = {row: r, col: c};
+    statusEl.textContent = "✅ Piece selected. Click destination.";
+    render();
+    return;
+  }
+  
+  // Clicking on destination
+  if (selected && (!piece || piece.color !== 'w')) {
+    const moves = getAllMovesForColor(board, 'w');
+    const legalMove = moves.moves.find(m => 
+      m.from[0] === selected.row && 
+      m.from[1] === selected.col && 
+      m.to[0] === r && 
+      m.to[1] === c
+    );
+    
+    if (!legalMove) {
+      statusEl.textContent = "❌ Invalid move. Try again.";
+      return;
+    }
+    
+    executeMove([selected.row, selected.col], [r, c], legalMove.capture);
+    
+    // Check for multi-jump continuation
+    if (legalMove.capture) {
+      const canContinue = canContinueJump(r, c);
+      
+      if (canContinue) {
+        currentJumpPiece = {row: r, col: c};
+        selected = null;
+        statusEl.textContent = "⚡ You must continue capturing! Click on your piece to continue.";
+        return;
+      }
+    }
+    
+    // Move complete
+    currentJumpPiece = null;
+    selected = null;
+    turn = 'b';
+    
+    setTimeout(() => {
+      computerMove();
+    }, 500);
+  }
+});
+
+// Computer AI (simple)
+function computerMove() {
+  if (gameOver || turn !== 'b') return;
+  
+  statusEl.textContent = "🤔 Computer thinking...";
+  
+  setTimeout(() => {
+    const moves = getAllMovesForColor(board, 'b');
+    
+    if (moves.moves.length === 0) {
+      gameOver = true;
+      statusEl.textContent = "🏆 You win! Computer has no moves.";
+      render();
+      return;
+    }
+    
+    // Simple AI: prefer captures, then random move
+    const captureMoves = moves.moves.filter(m => m.capture);
+    const moveList = captureMoves.length > 0 ? captureMoves : moves.moves;
+    
+    const randomMove = moveList[Math.floor(Math.random() * moveList.length)];
+    
+    if (randomMove) {
+      executeMove(randomMove.from, randomMove.to, randomMove.capture);
+      
+      // Check for multi-jump continuation
+      if (randomMove.capture) {
+        const canContinue = canContinueJump(randomMove.to[0], randomMove.to[1]);
+        
+        if (canContinue) {
+          currentJumpPiece = {row: randomMove.to[0], col: randomMove.to[1]};
+          setTimeout(() => {
+            statusEl.textContent = "⚡ Computer continues capturing...";
+            setTimeout(computerMove, 500);
+          }, 300);
+          return;
+        }
+      }
+      
+      currentJumpPiece = null;
+      turn = 'w';
+      selected = null;
+      
+      const playerMoves = getAllMovesForColor(board, 'w');
+      statusEl.textContent = playerMoves.hasCaptures 
+        ? `🎯 Your turn. Mandatory capture available!` 
+        : "🎯 Your turn. Select a white piece.";
+    }
+  }, 500);
+}
+
+document.getElementById('undoBtn').addEventListener('click', () => {
+  if (moveHistory.length === 0 || turn === 'b') return;
+  
+  const lastState = moveHistory.pop();
+  board = lastState.board;
+  turn = lastState.turn;
+  moveCount = lastState.moveNumber;
+  selected = null;
+  currentJumpPiece = lastState.currentJumpPiece;
+  capturedPieces = [];
+  
+  if (moveHistory.length === 0) {
+    document.getElementById('undoBtn').disabled = true;
+  }
+  
+  statusEl.textContent = "↩️ Move undone. Your turn again.";
+  render();
+});
+
+function resetGame() {
+  board = makeBoard();
+  turn = 'w';
+  selected = null;
+  gameOver = false;
+  moveHistory = [];
+  moveCount = 0;
+  currentJumpPiece = null;
+  capturedPieces = [];
+  
+  document.getElementById('undoBtn').disabled = true;
+  statusEl.textContent = "🎮 New game started! White's turn. Click on a white piece.";
+  render();
+}
+
+document.getElementById('hintBtn').addEventListener('click', () => {
+  showHints = !showHints;
+  document.getElementById('hintBtn').textContent =
+    showHints ? '🙈 Hide Hints' : '💡 Show Hints';
+  render();
+});
+
+// Initialize
+resetGame();
+</script>
+</body>
+</html>
